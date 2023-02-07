@@ -1,2 +1,11 @@
 __pycache__
 .vscode
+*.tar.xz
+*.tar.gz
+data/models/
+alpha/
+buggy/
+d4j/
+log/
+out/
+parser/target/

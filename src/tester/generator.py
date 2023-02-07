@@ -3,6 +3,7 @@ import torch
 import sys
 import os
 from transformers import OpenAIGPTLMHeadModel
+import traceback
 
 GENERATOR_DIR = os.path.abspath(__file__)[: os.path.abspath(__file__).rindex('/') + 1]
 sys.path.append(GENERATOR_DIR + '../models/')
