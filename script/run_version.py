@@ -10,7 +10,7 @@ from typing import List, Dict, Tuple, Set
 ROOTDIR = "/root/CURE"
 bugid = sys.argv[1]
 proj, bid = bugid.split("-")
-max_line_no = 500
+max_line_no = 40
 
 sys.path.append(os.path.join(ROOTDIR, "data", "data"))
 import prepare_testing_data as ptd
@@ -344,6 +344,8 @@ def run() -> None:
       locations.append((filename, start_line, fl_score))
       d4j_dir = os.path.join(ROOTDIR, "d4j", bugid)
       meta = [[proj, bid, filename, str(start_line), str(start_line + 1)]]
+      if os.path.exists(os.path.join(d4j_dir, "tmp", str(line_no), "out", "dumped_patches.json")):
+        continue
       prepare(d4j_dir, line_no, filepath, start_line)
       generate(d4j_dir, line_no)
       rerank(d4j_dir, line_no, meta)

@@ -8,4 +8,5 @@ buggy/
 d4j/
 log/
 out/
+out-*/
 parser/target/

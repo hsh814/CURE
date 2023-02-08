@@ -174,12 +174,14 @@ def run_gen(core, job_queue: mp.Queue):
         bugid = job_queue.get()
         print(f"gen {bugid} using core {core}")
         start_at = time()
-        cmd = ["python3", "experiment.py", "--bug_id", bugid, "--output_folder", "d4j", "--skip_v", "--re_rank", "--beam_width", "5", "--top_n_locations", "40"]
+        cmd = ["python3", "script/run_version.py", bugid]
         subp = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
         with open("log/gen-finished.csv", "a") as f:
             f.write(f"{bugid},{subp.returncode},{time()-start_at}s\n")
         print(f'[{current_time()}] Finish run {bugid} with {subp.returncode}')
         print(f"{bugid} ended in {time() - start_at}s")
+        with open("log/gen-time.csv", "a") as f:
+            f.write(f"{bugid},{time()-start_at}\n")
         out = ''
         err = ''
         try:
@@ -225,6 +227,8 @@ for l in lst:
 # two_list = closure_2_list + lang_list
 # three_list = math_list
 print("Q1: Efficiency of our approach: first correct patches and the first plausible patch. reasons for different performance between tools.")
+os.makedirs("log", exist_ok=True)
+os.makedirs("out", exist_ok=True)
 if sys.argv[1] == "genone":
     print("genone")
     run_gen(int(sys.argv[2]), )
