@@ -105,7 +105,7 @@ def insert_fix_defects4j(file_path, start_loc, end_loc, patch, project_dir):
 def get_strings_numbers(file_path, loc):
     numbers_set = {}
     strings_set = {}
-    with open(file_path, 'r') as file:
+    with open(file_path, 'r', errors="ignore") as file:
         data = file.readlines()
         for idx, line in enumerate(data):
             dist = loc - idx - 1

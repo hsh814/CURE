@@ -10,3 +10,5 @@ log/
 out/
 out-*/
 parser/target/
+sim/
+sim-*/

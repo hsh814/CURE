@@ -13,7 +13,7 @@ from tokenization import tokenize
 
 
 def command_with_timeout(cmd, timeout=10):
-    p = subprocess.Popen(cmd, stderr=subprocess.PIPE, stdout=subprocess.PIPE, universal_newlines=True)
+    p = subprocess.Popen(" ".join(cmd), stderr=subprocess.PIPE, stdout=subprocess.PIPE, universal_newlines=True, shell=True)
     t_beginning = time.time()
     while True:
         if p.poll() is not None:

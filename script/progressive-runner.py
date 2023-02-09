@@ -3,7 +3,7 @@ import subprocess
 import os
 import sys
 from sys import stderr
-from time import time
+from time import time, sleep
 from typing import List, Dict, Set, Tuple
 # import signal
 
@@ -110,12 +110,10 @@ def is_work_finished(outdir: str) -> bool:
         return False
     return True
 
+
 def run(bugid: str):
-    correct_patch = get_correct_patch(bugid)
-    has_correct_patch = len(correct_patch) > 1
-    print(f'run msv {bugid} - {id} - with correct patch: {correct_patch}')
     workdir = os.path.join(recoder_path, "d4j", bugid)
-    sim_data = os.path.join(recoder_path, f"sim-{id}", bugid, f"{bugid}-sim.json")
+    sim_data = os.path.join(recoder_path, f"sim", bugid, f"{bugid}-sim.json")
     os.makedirs(os.path.dirname(sim_data), exist_ok=True)
     # os.system(f"cp -r {recoder_path}/out-{old_id}/{bugid}-recoder-{old_id} {recoder_path}/out-{id}/{bugid}-recoder-{id}")
     # os.system(f"cp -r {recoder_path}/out-{old_id}/{bugid}-seapr-{old_id} {recoder_path}/out-{id}/{bugid}-seapr-{id}")
@@ -129,19 +127,20 @@ def run(bugid: str):
     cmd = ["python3", msv_path + "/msv-search.py", "-o", outdir, "-t", "180000", "-w", f"{workdir}", "-p", recoder_path, '-m', 'seapr', "-T", "18000",
            '--use-pass-test', '--recoder-mode', '--use-simulation-mode', sim_data, '--ignore-compile-error', '--', 'python3', f'{msv_path}/script/d4j_run_test.py', buggy_path]
     execute(bugid, cmd, "seapr", outdir)
-    # outdir = f"{recoder_path}/out-{id}/{bugid}-bounded-seapr"
-    # cmd = ["python3", msv_path + "/msv-search.py", "-o", outdir, "-t", "180000", "-w", f"{workdir}", "-p", recoder_path, '-m', 'seapr', "-T", "18000",
-    #        '--use-pass-test', '--recoder-mode', '--use-simulation-mode', sim_data, '--ignore-compile-error', '--bounded-seapr', '--', 'python3', f'{msv_path}/script/d4j_run_test.py', buggy_path]
-    # execute(bugid, cmd, "bounded-seapr", outdir)
     for i in range(50):
-        outdir = f"{recoder_path}/out-{id}/{bugid}-genprog-{i}"
+        outdir = f"{recoder_path}/out-{id}/{bugid}-guided-{i}"
         if use_opt:
             cmd = ["python3", msv_path + "/msv-search.py", "-o", outdir, "-t", "180000", "-w", f"{workdir}", "-p", recoder_path, '-m', 'guided', "-T", "18000", opt,
                '--use-pass-test', '--recoder-mode', '--use-simulation-mode', sim_data, "--use-exp-alpha", '--seed', str(SEEDS[i]), '--', 'python3', f'{msv_path}/script/d4j_run_test.py', buggy_path]
         else:
-            cmd = ["python3", msv_path + "/msv-search.py", "-o", outdir, "-t", "180000", "-w", f"{workdir}", "-p", recoder_path, '-m', 'genprog', "-T", "18000",
+            cmd = ["python3", msv_path + "/msv-search.py", "-o", outdir, "-t", "180000", "-w", f"{workdir}", "-p", recoder_path, '-m', 'guided', "-T", "18000",
                '--use-pass-test', '--recoder-mode', '--use-simulation-mode', sim_data, "--use-exp-alpha", '--seed', str(SEEDS[i]), '--', 'python3', f'{msv_path}/script/d4j_run_test.py', buggy_path]
         execute(bugid, cmd, f"guided-{i}", outdir)
+        outdir = f"{recoder_path}/out-{id}/{bugid}-genprog-{i}"
+        cmd = ["python3", msv_path + "/msv-search.py", "-o", outdir, "-t", "180000", "-w", f"{workdir}", "-p", recoder_path, '-m', 'genprog', "-T", "18000",
+                '--use-pass-test', '--recoder-mode', '--use-simulation-mode', sim_data, "--use-exp-alpha", '--seed', str(SEEDS[i]), '--', 'python3', f'{msv_path}/script/d4j_run_test.py', buggy_path]
+        execute(bugid, cmd, f"genprog-{i}", outdir)
+
     with open(f"log/finished-{id}.csv", "a") as f:
         f.write(f"{bugid}\n")
 
@@ -172,10 +171,7 @@ def run_gen(core, job_queue: mp.Queue):
     env["CUDA_VISIBLE_DEVICES"] = str(core)
     while not job_queue.empty():
         bugid = job_queue.get()
-        if check_ready(bugid):
-            continue
         print(f"gen {bugid} using core {core}")
-        os.system(f"rm -r d4j/{bugid}")
         start_at = time()
         cmd = ["python3", "script/run_version.py", bugid]
         subp = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
@@ -216,9 +212,18 @@ def get_bugids(filename: str) -> List[str]:
             l.append(line.split(",")[0])
     return l
 
-def check_ready(bugid: str) -> bool:
-    switch_info_file = os.path.join(recoder_path, "d4j", bugid, "switch-info.json")
-    return os.path.exists(switch_info_file)
+
+def get_alive(bugids: list, done: set) -> list:
+    alive = list()
+    for bugid in bugids:
+        if bugid in done:
+            continue
+        switch_info_file = os.path.join(recoder_path, "d4j", bugid, "switch-info.json")
+        if not os.path.exists(switch_info_file):
+            continue
+        alive.append(bugid)
+        done.add(bugid)
+    return alive
 
 lst = get_bugids("data/bugs.csv")
 exclude = get_bugids("log/exclude.csv")
@@ -295,11 +300,24 @@ elif sys.argv[1] == "msv":
     print(f"total {len(lst)}!")
     pool=mp.Pool(processes=(64))
     result=[]
-    # signal.signal(signal.SIGHUP,signal.SIG_IGN)
-    print("start!")
-    pool.map(run, lst)
-    # for b in bugs:
-    #     result.append(pool.apply_async(run, args=b))
+    done = set()
+    wait_time = 1
+    while len(lst) > len(done):
+        alive = get_alive(lst, done)
+        if len(alive) == 0:
+            sleep(60)
+            wait_time += 1
+            if wait_time % 30 == 0:
+                print(f"wait {wait_time} minutes")
+                not_done = list()
+                for bugid in lst:
+                    if bugid not in done:
+                        not_done.append(bugid)
+                print(f"not done: {not_done}")
+            continue
+        print(f"alive: {len(alive)}, total: {len(lst)}, done: {len(done)}")
+        wait_time = 1
+        pool.map_async(run, alive)
     pool.close()
     pool.join()
     print("exit!")
