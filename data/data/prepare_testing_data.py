@@ -106,7 +106,9 @@ def write_identifiers(java_class_path, java_keyword_path, result_path, identifie
 
 def prepare_cure_input(buggy_file, start_line, end_line, java_class_path, java_keyword_path, tmp_dir, output_dir):
     call_java_parser(buggy_file, start_line, end_line, tmp_dir + '/tmp.json')
+    time.sleep(2)
     write_buggy_ctx(tmp_dir + '/tmp.json', output_dir + '/input.txt')
+    time.sleep(2)
     write_identifiers(
         java_class_path, java_keyword_path, tmp_dir + '/tmp.json', 
         output_dir + '/identifier.txt', output_dir + '/identifier.tokens'
