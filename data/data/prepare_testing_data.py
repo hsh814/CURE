@@ -30,6 +30,8 @@ def command_with_timeout(cmd, timeout=10):
 
 def compile_java_parser():
     os.chdir(IDENTIFIER_DATA_DIR + '../../parser/')
+    if (os.path.exists("target/jiang719/CUREInput.class")):
+        return
     command_with_timeout([
         'javac', '-cp', '".:lib/*"', '-d', 'target', 'src/main/java/jiang719/*.java'
     ])
@@ -136,7 +138,7 @@ def clean_testing_bpe(input_bpe_file, identifier_bpe_file):
 
 
 if __name__ == '__main__':
-    # compile_java_parser()
+    compile_java_parser()
     prepare_cure_input(
         buggy_file=IDENTIFIER_DATA_DIR + '../../parser/src/test/java/jiang719/Test.java',
         start_line=11, 

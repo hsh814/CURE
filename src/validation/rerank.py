@@ -80,7 +80,7 @@ def cure_rerank(meta, hypo_path_list, output_path):
                 if patch not in added_patches:
                     added_patches.add(patch)
                     reranked_hypo[key]['patches'].append({'patch': patch, 'score': score})
-            if len(added_patches) >= 500:
+            if len(added_patches) >= 5000:
                 break
 
     print('dumping result in json file')

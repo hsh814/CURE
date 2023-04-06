@@ -8,9 +8,6 @@ import shutil
 import javalang
 from typing import List, Dict, Tuple, Set
 ROOTDIR = os.path.abspath(os.path.abspath(__file__)[: os.path.abspath(__file__).rindex('/') + 1] + "..")
-bugid = sys.argv[1]
-proj, bid = bugid.split("-")
-max_line_no = 40
 
 sys.path.append(os.path.join(ROOTDIR, "data", "data"))
 import prepare_testing_data as ptd
@@ -114,7 +111,7 @@ def validate_defects4j(file_name: str, line_no: int, fl_score: float, original_f
     bug_start_time = time.time()
     for tokenized_patch in reranked_result[key]['patches']:
       # validate 5000 patches for each bug at most
-      if len(dump_result['cases']) >= 500:
+      if len(dump_result['cases']) >= 5000:
           break
 
       score = tokenized_patch['score']
@@ -140,18 +137,13 @@ def validate_defects4j(file_name: str, line_no: int, fl_score: float, original_f
   json.dump(dump_result, open(output_path, 'w'), indent=2)
 
 
-def init() -> None:
-  os.makedirs(f"{ROOTDIR}/buggy", exist_ok=True)
-  os.system(f'defects4j checkout -p {proj} -v {bid}b -w buggy/{bugid}')
-  os.system(f"rm -r {ROOTDIR}/d4j/{bugid} {ROOTDIR}/d4j/{bugid}-bak")
-
 def run_command_with_file(cmd: list, input_file: str, output_file: str) -> None:
   with open(input_file, "r") as in_f, open(output_file, "w") as ou_f:
     p = subprocess.Popen(cmd, stderr=subprocess.PIPE, stdin=in_f, stdout=ou_f)
     out, err = p.communicate()
     print(err)
 
-def prepare(d4j_dir: str, line_no: int, buggy_file: str, start_line: int) -> None:
+def prepare(d4j_dir: str, line_no: int, buggy_file: str, start_line: int, end_line: int) -> None:
   # d4j_dir: d4j/Chart-1
   tmp_dir = os.path.join(d4j_dir, "tmp", str(line_no), "tmp")
   out_dir = os.path.join(d4j_dir, "tmp", str(line_no), "out")
@@ -160,7 +152,7 @@ def prepare(d4j_dir: str, line_no: int, buggy_file: str, start_line: int) -> Non
   ptd.prepare_cure_input(
         buggy_file=buggy_file,
         start_line=start_line,
-        end_line=start_line + 1,
+        end_line=end_line,
         java_class_path=f"{ROOTDIR}/data/data/java_class.json",
         java_keyword_path=f"{ROOTDIR}/data/data/java_keyword.json",
         tmp_dir=tmp_dir,
@@ -181,8 +173,7 @@ def prepare(d4j_dir: str, line_no: int, buggy_file: str, start_line: int) -> Non
   # run clean_testing_bpe() after running the subword-nmt commands above
   ptd.clean_testing_bpe(input_bpe_file, identifier_bpe_file)
 
-def generate(d4j_dir: str, line_no: int) -> None:
-  beam_size = 100
+def generate(d4j_dir: str, line_no: int, beam_size: int) -> None:
   vocab_file = os.path.join(ROOTDIR, "data", "vocabulary", "vocabulary.txt")
   out_dir = os.path.join(d4j_dir, "tmp", str(line_no), "out")
   input_file = os.path.join(out_dir, "input_bpe.txt")
@@ -210,31 +201,30 @@ def dump(d4j_dir: str, line_no: int, fl_score: float, file_name: str, original_f
   ranked_file = os.path.join(outdir, "reranked_patches.json")
   output_file = os.path.join(outdir, "dumped_patches.json")
   validate_defects4j(file_name, line_no, fl_score, original_file, start_line, ranked_file, output_file, patch_dir)
-  print(f"Done dumping patches {line_no} for {bugid}.")
 
-def get_func_map(locations: list) -> list:
-  func_map: Dict[str, List[dict]] = dict()
-  for file, line_number, fl_score in locations:
-    real_file = os.path.join(ROOTDIR, "buggy", bugid, file)
-    if file not in func_map:
-      func_map[file] = list()
-    try:
-      func_loc = get_method_range(real_file, line_number)
-      func_map[file].append(func_loc)
-    except Exception:
-      continue
-  func_locations = list()
-  for file in func_map:
-    func_filter = dict()
-    functions = list()
-    tmp_file_level = { "file": file, "functions": functions }
-    for func in func_map[file]:
-      func_id = f"{func['function']}:{func['begin']}-{func['end']}"
-      if func_id not in func_filter:
-        func_filter[func_id] = func
-        functions.append(func)
-    func_locations.append(tmp_file_level)
-  return func_locations
+# def get_func_map(locations: list) -> list:
+#   func_map: Dict[str, List[dict]] = dict()
+#   for file, line_number, fl_score in locations:
+#     real_file = os.path.join(ROOTDIR, "buggy", bugid, file)
+#     if file not in func_map:
+#       func_map[file] = list()
+#     try:
+#       func_loc = get_method_range(real_file, line_number)
+#       func_map[file].append(func_loc)
+#     except Exception:
+#       continue
+#   func_locations = list()
+#   for file in func_map:
+#     func_filter = dict()
+#     functions = list()
+#     tmp_file_level = { "file": file, "functions": functions }
+#     for func in func_map[file]:
+#       func_id = f"{func['function']}:{func['begin']}-{func['end']}"
+#       if func_id not in func_filter:
+#         func_filter[func_id] = func
+#         functions.append(func)
+#     func_locations.append(tmp_file_level)
+#   return func_locations
 
 def add_tests(outdir: str, bugid: str, switch_info: dict) -> None:
   proj = bugid.split("-")[0]
@@ -290,7 +280,7 @@ def add_tests(outdir: str, bugid: str, switch_info: dict) -> None:
   switch_info["failed_passing_tests"] = failed_tests
 
 
-def collect_patches(d4j_dir: str, locations: list) -> None:
+def collect_patches(bugid: str, d4j_dir: str) -> None:
   obj = { "project_name": bugid }
   add_tests(os.path.join(d4j_dir, "tmp"), bugid, obj)
   file_map = dict()
@@ -314,46 +304,67 @@ def collect_patches(d4j_dir: str, locations: list) -> None:
     rules.append(file_info)
   obj["rules"] = rules
   obj["ranking"] = patch_ranking
-  obj["func_locations"] = get_func_map(locations)
+  # obj["func_locations"] = get_func_map(locations)
   with open(os.path.join(d4j_dir, "switch-info.json"), "w") as f:
     json.dump(obj, f, indent=2)
 
-def run() -> None:
-  print(f"Running {bugid}...")
-  locationdir = '%s/location/ochiai/%s/%s.txt' % (ROOTDIR, proj.lower(), bid)
-  line_no = -1
-  init()
-  dirs = os.popen(f'defects4j export -p dir.src.classes -w {ROOTDIR}/buggy/{bugid}').readlines()[-1]
-  locations = list()
-  with open(locationdir, "r") as f:
+def get_meta(meta_file: str) -> dict:
+  result = dict()
+  with open(meta_file, "r") as f:
     for line in f.readlines():
       line = line.strip()
       if len(line) == 0 or line.startswith("#"):
         continue
-      line_no += 1
-      if line_no >= max_line_no:
-        break
-      classname, others = line.split("#")
-      if '$' in classname:
-        classname = classname[:classname.index('$')]
-      filename = f"{dirs}/{classname.replace('.', '/')}.java"
-      filepath = os.path.join(ROOTDIR, "buggy", bugid, filename)
-      tokens = others.split(",")
-      start_line = int(tokens[0])
-      fl_score = float(tokens[1])
-      locations.append((filename, start_line, fl_score))
-      d4j_dir = os.path.join(ROOTDIR, "d4j", bugid)
-      meta = [[proj, bid, filename, str(start_line), str(start_line + 1)]]
-      if os.path.exists(os.path.join(d4j_dir, "tmp", str(line_no), "out", "dumped_patches.json")):
+      tokens = line.split()
+      if len(tokens) < 5:
         continue
-      prepare(d4j_dir, line_no, filepath, start_line)
-      generate(d4j_dir, line_no)
-      rerank(d4j_dir, line_no, meta)
-      dump(d4j_dir, line_no, fl_score, filename, filepath, start_line)    
+      proj = tokens[0]
+      bid = tokens[1]
+      file = tokens[2]
+      start = int(tokens[3])
+      end = int(tokens[4])
+      obj = { "file": file, "start": start, "end": end }
+      result[f"{proj}-{bid}"] = obj
+  return result
+
+def run(args) -> None:
+  print(f"Running {args.bug_id}...")
+  proj, bid = args.bug_id.split("-")
+  bugid = f"{proj}-{bid}"
+  os.makedirs(f"{ROOTDIR}/buggy", exist_ok=True)
+  os.system(f'defects4j checkout -p {proj} -v {bid}b -w buggy/{bugid}')
+  os.system(f"rm -r {ROOTDIR}/d4j/{bugid}")
+  meta = os.path.join(ROOTDIR, "candidate_patches", "Defects4Jv1.2", "meta.txt")
+  meta_map = get_meta(meta)
+  info = meta_map[bugid]
+  # dirs = os.popen(f'defects4j export -p dir.src.classes -w {ROOTDIR}/buggy/{bugid}').readlines()[-1]
+  filename = info["file"]
+  filepath = os.path.join(ROOTDIR, "buggy", bugid, filename)
+  start_line = info["start"]
+  end_line = info["end"]
+  d4j_dir = os.path.join(ROOTDIR, "d4j", bugid)
+  line_no = 0
+  fl_score = 1.0
+  meta = [[proj, bid, filename, str(start_line), str(end_line)]]
+  prepare(d4j_dir, line_no, filepath, start_line)
+  generate(d4j_dir, line_no, args.beam_size)
+  rerank(d4j_dir, line_no, meta)
+  dump(d4j_dir, line_no, fl_score, filename, filepath, start_line)    
   # collect result to switch_info file
-  collect_patches(d4j_dir, locations)
+  collect_patches(bugid, d4j_dir)
  
 
 if __name__ == "__main__":
-  run()
-    
+  import argparse
+  parser = argparse.ArgumentParser()
+  parser.add_argument("--bug_id", type=str, required=True)
+  parser.add_argument("--output_dir", type=str, required=True)
+  parser.add_argument("--beam_size", type=int, default=50)
+  parser.add_argument("--template_model", type=str, default="recoder")
+  parser.add_argument("--nmt_model", type=str, default="codex")
+  parser.add_argument("--template_engine", type=str, default="gumtree")
+  parser.add_argument("--skip_template_gen", dest="skip_template_gen", action='store_true', default=False)
+  parser.add_argument("--template_path", type=str, default=None)
+  parser.add_argument("--benchmark", type=str, default="Defects4J")
+  args = parser.parse_args()
+  run(args)
