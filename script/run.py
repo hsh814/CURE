@@ -285,7 +285,7 @@ def collect_patches(bugid: str, d4j_dir: str) -> None:
   add_tests(os.path.join(d4j_dir, "tmp"), bugid, obj)
   file_map = dict()
   patch_ranking = list()
-  for i in range(max_line_no):
+  for i in range(1):
     dumped_patch_file = os.path.join(d4j_dir, "tmp", str(i), "out", "dumped_patches.json")
     if os.path.exists(dumped_patch_file):
       with open(dumped_patch_file, "r") as f:
@@ -331,9 +331,12 @@ def run(args) -> None:
   print(f"Running {args.bug_id}...")
   proj, bid = args.bug_id.split("-")
   bugid = f"{proj}-{bid}"
+  d4j_dir = args.output_dir
+  if len(d4j_dir) == 0:
+    d4j_dir = os.path.abspath(os.path.join(ROOTDIR, "..", "data", "cure", bugid))
   os.makedirs(f"{ROOTDIR}/buggy", exist_ok=True)
   os.system(f'defects4j checkout -p {proj} -v {bid}b -w buggy/{bugid}')
-  os.system(f"rm -r {ROOTDIR}/d4j/{bugid}")
+  os.system(f"rm -rf {d4j_dir}")
   meta = os.path.join(ROOTDIR, "candidate_patches", "Defects4Jv1.2", "meta.txt")
   meta_map = get_meta(meta)
   info = meta_map[bugid]
@@ -341,12 +344,11 @@ def run(args) -> None:
   filename = info["file"]
   filepath = os.path.join(ROOTDIR, "buggy", bugid, filename)
   start_line = info["start"]
-  end_line = info["end"]
-  d4j_dir = os.path.join(ROOTDIR, "d4j", bugid)
+  end_line = info["end"] + 1
   line_no = 0
   fl_score = 1.0
   meta = [[proj, bid, filename, str(start_line), str(end_line)]]
-  prepare(d4j_dir, line_no, filepath, start_line)
+  prepare(d4j_dir, line_no, filepath, start_line, end_line)
   generate(d4j_dir, line_no, args.beam_size)
   rerank(d4j_dir, line_no, meta)
   dump(d4j_dir, line_no, fl_score, filename, filepath, start_line)    
@@ -358,7 +360,7 @@ if __name__ == "__main__":
   import argparse
   parser = argparse.ArgumentParser()
   parser.add_argument("--bug_id", type=str, required=True)
-  parser.add_argument("--output_dir", type=str, required=True)
+  parser.add_argument("--output_dir", type=str, default="")
   parser.add_argument("--beam_size", type=int, default=50)
   parser.add_argument("--template_model", type=str, default="recoder")
   parser.add_argument("--nmt_model", type=str, default="codex")
