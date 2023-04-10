@@ -132,6 +132,7 @@ class GPTFConvEncoder(nn.Module):
             
             x = embed[mask, :]          # B x src, H
             x = x.view(bsz, -1, x.size(1))      # B, src, H
+            print(f"src_tokens: {src_tokens.size()} src_tokens_with_prev_context: {src_tokens_with_prev_context.size()} x: {x.size()} mask: {mask.size()} embed: {embed.size()}")
 
             src_tokens_with_pre_context = src_tokens_with_prev_context.view(-1)  # B x context_src
             src_tokens = src_tokens_with_pre_context[mask]      # B x src
@@ -416,7 +417,7 @@ class AttentionLayer(nn.Module):
     def forward(self, x, target_embedding, encoder_out, encoder_padding_mask):
         residual = x
         x = (self.in_projection(x) + target_embedding) * math.sqrt(0.5)
-        #print(x.size(), encoder_out[0].size(), encoder_out[1].size())
+        print(x.size(), encoder_out[0].size(), encoder_out[1].size())
         # B x L x C, B x C x L
         x = self.bmm(x, encoder_out[0])
 

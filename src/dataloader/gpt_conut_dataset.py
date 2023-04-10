@@ -35,10 +35,14 @@ class GPTCoNuTDataset():
         for i in range(len(src_item)):
             if src_item[i] == self.dictionary.ctx():
                 ctx_index = i
+                break
         ctx_item = src_item[ctx_index + 1:]
         src_item = src_item[: ctx_index]
 
         start = find_sublist(ctx_item, src_item)
+        while start > 900:
+            ctx_item = ctx_item[100:]
+            start = find_sublist(ctx_item, src_item)
         if start <= 0:
             ctx_item = [self.dictionary.eos()] + ctx_item
             start = 1

@@ -41,6 +41,7 @@ class Generator():
                     elif isinstance(self.model, GPTFConvModel):
                         hypothesis = self.beamsearch.generate_gpt_fconv(sample)
             except Exception as e:
+               traceback.print_exc()
                print(e)
                continue
             id = str(sample['id'].item())

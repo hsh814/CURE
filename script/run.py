@@ -282,7 +282,7 @@ def add_tests(outdir: str, bugid: str, switch_info: dict) -> None:
 
 def collect_patches(bugid: str, d4j_dir: str) -> None:
   obj = { "project_name": bugid }
-  add_tests(os.path.join(d4j_dir, "tmp"), bugid, obj)
+  # add_tests(os.path.join(d4j_dir, "tmp"), bugid, obj)
   file_map = dict()
   patch_ranking = list()
   for i in range(1):
