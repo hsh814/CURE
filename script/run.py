@@ -102,7 +102,7 @@ def insert_fix_defects4j(original_file, start_loc, end_loc, patch, target_file):
         file.write(line)
   return target_file
 
-def validate_defects4j(file_name: str, line_no: int, fl_score: float, original_file: str, start_line: int, reranked_result_path: str, output_path: str, patch_dir: str):
+def validate_defects4j(file_name: str, line_no: int, fl_score: float, original_file: str, start_line: int, end_line: int, reranked_result_path: str, output_path: str, patch_dir: str):
   cnt = 0
   reranked_result = json.load(open(reranked_result_path, 'r'))
   dump_result = {}
@@ -127,7 +127,7 @@ def validate_defects4j(file_name: str, line_no: int, fl_score: float, original_f
         cnt += 1
         patch = patch.strip()
         patched_file = os.path.join(patch_dir, str(cnt), os.path.basename(original_file))
-        insert_fix_defects4j(original_file, start_line, start_line + 1, patch, patched_file)
+        insert_fix_defects4j(original_file, start_line, end_line, patch, patched_file)
         if not syntax_check(patched_file):
           continue
         loc = os.path.join("patch", str(line_no), str(cnt), os.path.basename(original_file))
@@ -195,12 +195,12 @@ def rerank(d4j_dir: str, line_no: int, meta: list) -> None:
                     os.path.join(outdir, "gpt_fconv_1.txt")]
   rr.cure_rerank(meta, hypo_path_list, output_path)
 
-def dump(d4j_dir: str, line_no: int, fl_score: float, file_name: str, original_file: str, start_line: int) -> None:
+def dump(d4j_dir: str, line_no: int, fl_score: float, file_name: str, original_file: str, start_line: int, end_line: int) -> None:
   patch_dir = os.path.join(d4j_dir, "patch", str(line_no))
   outdir = os.path.join(d4j_dir, "tmp", str(line_no), "out")
   ranked_file = os.path.join(outdir, "reranked_patches.json")
   output_file = os.path.join(outdir, "dumped_patches.json")
-  validate_defects4j(file_name, line_no, fl_score, original_file, start_line, ranked_file, output_file, patch_dir)
+  validate_defects4j(file_name, line_no, fl_score, original_file, start_line, end_line, ranked_file, output_file, patch_dir)
 
 # def get_func_map(locations: list) -> list:
 #   func_map: Dict[str, List[dict]] = dict()
@@ -351,7 +351,7 @@ def run(args) -> None:
   prepare(d4j_dir, line_no, filepath, start_line, end_line)
   generate(d4j_dir, line_no, args.beam_size)
   rerank(d4j_dir, line_no, meta)
-  dump(d4j_dir, line_no, fl_score, filename, filepath, start_line)    
+  dump(d4j_dir, line_no, fl_score, filename, filepath, start_line, end_line)    
   # collect result to switch_info file
   collect_patches(bugid, d4j_dir)
  
